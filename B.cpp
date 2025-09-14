@@ -1,33 +1,40 @@
 #include <iostream>
 #include <vector>
 
+std::vector<int> BuildSmallestPrimeFactorTable(int n) {
+    std::vector<int> spf(n + 1, 0);
+
+    for (int p = 2; p <= n; ++p) {
+        if (spf[p] == 0) {
+            for (long long multiple = 1LL * p * 2; multiple <= n; multiple += p) {
+                if (spf[static_cast<int>(multiple)] == 0) {
+                    spf[static_cast<int>(multiple)] = p;
+                }
+            }
+        }
+    }
+
+    return spf;
+}
+
+long long SumSmallestPrimeFactors(const std::vector<int>& spf) {
+    long long total = 0;
+    for (int value : spf) {
+        total += value;
+    }
+    return total;
+}
+
 int main() {
-  int n;
-
-  std::cin >> n;
-  std::vector<int> arr(n + 1, 0);
-  int f_ptr = 2;
-  while(f_ptr < (n / 2 + 1)) {
-    for(int i = f_ptr * 2; i < n + 1; i += f_ptr) {
-      if(arr[i] == 0) {
-        arr[i] = f_ptr;
-      }
+    int size;
+  
+    if (!(std::cin >> size) || size < 0) {
+        return 0;
     }
 
-    f_ptr++;
-    while (arr[f_ptr] != 0) {
-      f_ptr++;
-      if(f_ptr >= ((n + 1) / 2 + 1)) {
-        break;
-      }
-    }
-  }
+    const auto spf = BuildSmallestPrimeFactorTable(size);
+    const long long result = SumSmallestPrimeFactors(spf);
 
-  long long int sum = 0;
-  for(int i = 0; i < n + 1; i++) {
-    sum += arr[i];
-  }
-
-  std::cout << sum;
-
+    std::cout << result;
+    return 0;
 }
