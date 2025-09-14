@@ -21,70 +21,107 @@ std::complex<T> twiddle(size_t k, size_t N, bool invert)
 }
 
 template<typename T = double>
-void fft(std::vector<std::complex<double>>& a, bool invert)
-{
-  size_t N = a.size();
-  if (N == 1) return;
+struct Polynomical {
+  std::vector<std::complex<T>> coef;
 
-  std::vector<std::complex<double>> even(N / 2), odd(N / 2);
-  for (size_t i = 0; i < N / 2; ++i) {
-    even[i] = a[2 * i];
-    odd[i]  = a[2 * i + 1];
+  Polynomical(size_t size) : coef(size) {
+
   }
 
-  fft(even, invert);
-  fft(odd,  invert);
+  std::complex<T>& operator[](size_t ind) {
+    return coef[ind];
+  }
 
-  for (size_t k = 0; k < N / 2; ++k) {
-    std::complex<double> t = odd[k] * twiddle<T>(k, N, invert);
+  const std::complex<T>& operator[](size_t ind) const {
+    return coef[ind];
+  }
 
-    if (invert) {
-      a[k]        = (even[k] + t) * 0.5;
-      a[k + N/2]  = (even[k] - t) * 0.5;
-    } else {
-      a[k]        =  even[k] + t;
-      a[k + N/2]  =  even[k] - t;
+  void fft(bool invert)
+  {
+    size_t N = coef.size();
+    if (N == 1) return;
+
+    Polynomical<T> even = Polynomical<T>::make_polynomical_for_fft(*this, 0);
+    Polynomical<T> odd = Polynomical<T>::make_polynomical_for_fft(*this, 1);
+
+    even.fft(invert);
+    odd.fft(invert);
+
+    for (size_t k = 0; k < N / 2; ++k) {
+      std::complex<double> t = odd[k] * twiddle<T>(k, N, invert);
+
+      if (invert) {
+        coef[k]        = (even[k] + t) * 0.5;
+        coef[k + N/2]  = (even[k] - t) * 0.5;
+      } else {
+        coef[k]        =  even[k] + t;
+        coef[k + N/2]  =  even[k] - t;
+      }
     }
   }
+
+  size_t size() const{
+    return coef.size();
+  }
+  
+  void forward(int N) {
+    reverse(coef.begin(), coef.end());
+    coef.resize(N);
+    this->fft(false);    
+  }
+  
+  int backward(int N) {
+    this->fft(true);
+    std::reverse(coef.begin(), coef.end());
+    int first = 0;
+    while (first < N && std::abs(coef[first].real()) < 1e-3)
+      ++first;
+    
+    return first
+  }
+
+  static Polynomical<T> make_polynomical_for_fft(const Polynomical<T>& source, bool parity) {
+    size_t size =  source.size() / 2;
+
+    Polynomical<T> to_ret(size);
+    for (size_t i = 0; i < size; ++i) {
+      to_ret[i] = source[2 * i + parity];
+    }
+
+    return to_ret;
+  }
+};
+
+std::istream& operator>>(std::istream& in, Polynomical<double> poly) {
+  for (auto& x : poly.coef) {
+    double t; in >> t;
+    x = { t, 0.0 };
+  }
 }
+
 
 int main()
 {
   int n, m;
-  auto read_vec = [](size_t k) {
-    std::vector<std::complex<double>> v(k);
-    for (auto& x : v) {
-      double t; std::cin >> t;
-      x = { t, 0.0 };
-    }
-    return v;
-  };
-
+  
   std::cin >> n;
   n += 1;
-  std::vector<std::complex<double>> a = read_vec(n);
+  Polynomical<double> a(n);
+  std::cin >> a;
+  
   std::cin >> m;
   m += 1;
-  std::vector<std::complex<double>> b = read_vec(m);
-  
-  reverse(a.begin(), a.end());
-  reverse(b.begin(), b.end());
+  Polynomical<double> b(m);
+  std::cin >> b;
   
   int N = pow_2(n + m - 1);
-
-  a.resize(N);
-  b.resize(N);
   
-  fft(a, false);
-  fft(b, false);
+  a.forward(N);
+  b.forward(N);
   
   for (int i = 0; i < N; ++i) a[i] *= b[i];
   
-  fft(a, true);
-  std::reverse(a.begin(), a.end());
-  int first = 0;
-  while (first < n + m - 1 && std::abs(a[first].real()) < 1e-3)
-    ++first;
+  int first = a.backward(n + m - 1);
 
   std::cout << n + m - 2 << ' ';
   for (int i = first; i < first + n + m - 1; ++i)
