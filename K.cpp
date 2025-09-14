@@ -33,7 +33,7 @@ class Bor{
     head_node = Node();
   }
 
-  void AddWord(std::string word, std::size_t numb=0) {
+  void AddWord(std::string& word, std::size_t numb=0) {
     Node *cur_node = &head_node;
     for(int i = 0; i < word.size(); i++) {
       if(!cur_node->is_son(word[i])) {
@@ -105,7 +105,7 @@ class AhoKorasik{
     }
   }
 
-  std::vector<std::size_t> FindAmountPatterns(std::string word) {
+  std::vector<std::size_t> FindAmountPatterns(std::string& word) {
     std::vector<std::size_t> arr_pos(word.size());
     int cnt = 0;
     Node *cond = &search_pattern.head_node;
