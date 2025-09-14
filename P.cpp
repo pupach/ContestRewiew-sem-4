@@ -2,12 +2,9 @@
 #include <vector>
 #include <optional>
 #include <map>
-#include<fstream>
-
-using namespace std;
 
 
-std::vector<int> LCP(std::string str, std::vector<int> suff) {
+std::vector<int> LCP(const std::string& str, const std::vector<int>& suff) {
   int n = str.size(), temp = 0;
   std::vector<int> pos(n, -1);
   std::vector<int> lcp(n, -1);
@@ -23,9 +20,9 @@ std::vector<int> LCP(std::string str, std::vector<int> suff) {
       temp = 0;
     }
     else {
-      int p = suff[pos[i] + 1];
-      while(std::max(i + temp, p  + temp) < n) {
-        if (str[i + temp] != str[p + temp]) {
+      int cur = suff[pos[i] + 1];
+      while(std::max(i + temp, cur  + temp) < n) {
+        if (str[i + temp] != str[cur + temp]) {
           break;
         }
         temp++;
@@ -39,150 +36,143 @@ std::vector<int> LCP(std::string str, std::vector<int> suff) {
 }
 
 
-vector<int> suffix_array (vector<int> &s) {
-  s.push_back(-2);
-  int n = (int) s.size(),
-      cnt = 0,
-      cls = 0;
-  vector<int> c(n), p(n);
+std::vector<int> suffix_array (std::vector<int> &str) {
+  str.push_back(-2);
+  int n = str.size();
+  std::vector<int> rank(n, 0);
+  std::vector<int> sa(n, 0);
 
-  map< int, vector<int> > t;
-  for (int i = 0; i < n; i++)
-    t[s[i]].push_back(i);
+  std::map<int, std::vector<int>> valueBuckets;
+  for (int i = 0; i < n; ++i) valueBuckets[str[i]].push_back(i);
 
-
-  for (auto &x : t) {
-    for (int u : x.second)
-      c[u] = cls, p[cnt++] = u;
-    cls++;
+  int classCount = 0;
+  int writePos = 0;
+  for (auto &bucket : valueBuckets) {
+    for (int idx : bucket.second) {
+      rank[idx] = classCount;
+      sa[writePos++] = idx;
+    }
+    ++classCount;
   }
-
-  for (int l = 1; cls < n; l++) {
-    vector< vector<int> > a(cls);
-    vector<int> ct(n);
-    int d = (1<<l)/2;
-    int cclst  = 0;
-    cnt = 0;
-
-    for (int i = 0; i < n; i++) {
-      int k = (p[i]-d+n)%n;
-      a[c[k]].push_back(k);
+  for (int step = 1; classCount < n; step++) {
+    int offset = (1 << step) / 2;
+    std::vector<std::vector<int>> buckets(classCount);
+    for (int i = 0; i < n; ++i) {
+      int start = (sa[i] - offset + n) % n;
+      buckets[rank[start]].push_back(start);
     }
 
-    for (int i = 0; i < cls; i++) {
-      for (size_t j = 0; j < a[i].size(); j++) {
-        if (j == 0 || c[(a[i][j]+d)%n] != c[(a[i][j-1]+d)%n])
-          cclst++;
-        ct[a[i][j]] = cclst-1;
-        p[cnt++] = a[i][j];
+    std::vector<int> newRank(n, 0);
+    int newClassCount = 0;
+    writePos = 0;
+    for (int c = 0; c < classCount; ++c) {
+      auto &bucket = buckets[c];
+      for (size_t j = 0; j < bucket.size(); j++) {
+        if ((j == 0) || (rank[(bucket[j] + offset) % n] != rank[(bucket[j - 1] + offset) % n])) {
+          ++newClassCount;
+        }
+        newRank[bucket[j]] = newClassCount - 1;
+        sa[writePos++] = bucket[j];
       }
     }
 
-    c = ct;
-    cls = cclst;
+    rank.swap(newRank);
+    classCount = newClassCount;
   }
 
-  return vector<int>(p.begin()+1, p.end());
+  return std::vector<int>(sa.begin() + 1, sa.end());
 }
 
 struct Node {
-  std::vector<std::pair<int, std::string>> edges;
+  std::vector<int> edges;
   int depth = -1;
   int max_child_depth = 0;
   int color = -1;
 
   Node(int depth) : depth(depth) {}
-
-
-
 };
 
 struct SuffTree {
   std::vector<int> cur_path;
-  std::vector<Node> nods;
+  std::vector<Node> nodes;
+
+private:
   int size = -1;
   int size_f = -1;
-  
-  private:
-    int min_deep = 100000;
-    
-  public:
-    SuffTree(int size, int size_f) : size(size), size_f(size_f) {}
 
-    int addNextSuff(int prev, int lenght, int lcp) {
-      //std::cerr << "addNextSuff prev = " << prev << " lenght = " << lenght << " lcp = " << lcp << "\n";
-      if((nods[prev].depth == lcp)) {
-        auto added = Node(lenght);
-        nods.push_back(added);
-        cur_path.push_back(nods.size() - 1);
-        nods[prev].edges.push_back({cur_path.back(), ""});
+public:
+  SuffTree(int size, int size_f) : size(size), size_f(size_f) {}
 
-        return cur_path.back();
+  int addNextSuff(int prev, int lenght, int lcp) {
+    if(nodes[prev].depth == lcp) {
+      auto added = Node(lenght);
+      nodes.push_back(added);
+      cur_path.push_back(nodes.size() - 1);
+      nodes[prev].edges.push_back(cur_path.back());
+
+      return cur_path.back();
+    }
+    else {
+      auto prev_ind = cur_path.back();
+      cur_path.pop_back();
+      int parent = cur_path.back();
+      if(nodes[parent].depth < lcp) {
+        auto inserted = Node(lcp);
+        nodes.push_back(inserted);
+        cur_path.push_back(nodes.size() - 1);
+
+        nodes[parent].edges.back() = cur_path.back();
+        nodes[cur_path.back()].edges.push_back(prev_ind);
+      }
+      return addNextSuff(cur_path.back(), lenght, lcp);
+    }
+  }
+
+  std::pair<int, int> calculatePositions(const Node& parent, const Node& child, int stringLength) {
+    int start = stringLength - child.max_child_depth + parent.depth;
+    int end = start + child.depth - parent.depth + 1;
+    return {start, end};
+  }
+
+
+  int fill_max_depth(int cur, int& color) {
+    if(nodes[cur].max_child_depth == 0) {
+      nodes[cur].color = color;
+      color++;
+      nodes[cur].max_child_depth = nodes[cur].depth;
+      for(auto elem : nodes[cur].edges) {
+        nodes[cur].max_child_depth = std::max(nodes[cur].max_child_depth, fill_max_depth(elem, color));
+      }
+    }
+    return nodes[cur].max_child_depth;
+  }
+
+  void print_tree(int cur)  {
+    for(auto elem : nodes[cur].edges) {
+      auto [begin, end] = calculatePositions(nodes[cur], nodes[elem], size);
+      std::cout << nodes[cur].color << ' ';
+      if(begin >= size_f) {
+        std::cout << 1 << " " << begin - size_f << " " << end - size_f - 1 << "\n";
       }
       else {
-        auto prev_ind = cur_path.back();
-        cur_path.pop_back();
-        int parent = cur_path.back();
-        if(nods[parent].depth < lcp) {
-          auto inserted = Node(lcp);
-          nods.push_back(inserted);
-          cur_path.push_back(nods.size() - 1);
-
-          nods[parent].edges.back().first = cur_path.back();
-          nods[cur_path.back()].edges.push_back({prev_ind, ""});
-        }
-        return addNextSuff(cur_path.back(), lenght, lcp);
+        std::cout << 0 << " " << begin << " " << std::min(end - 1,  size_f) << "\n";
       }
+      print_tree(elem);
     }
-
-    std::pair<int, int> calculatePositions(Node parent, Node child, int stringLength) {
-     // std::cerr << "calculatePositions stringLength = " << stringLength << " child.max_child_depth = " << child.max_child_depth << " child.depth = " << child.depth << " parent.depth = " << parent.depth << "\n";
-      int start = stringLength - child.max_child_depth + parent.depth;
-      int end = start + child.depth - parent.depth + 1;
-      return {start, end};
-    }
-
-
-    int fill_max_depth(int cur, int& color) {
-      if(nods[cur].max_child_depth == 0) {
-        nods[cur].color = color;
-        color++;
-        nods[cur].max_child_depth = nods[cur].depth;
-        int max = -1;
-        for(auto elem : nods[cur].edges) {
-          nods[cur].max_child_depth = std::max(nods[cur].max_child_depth, fill_max_depth(elem.first, color));
-        }
-      }
-      return nods[cur].max_child_depth;
-    }
-
-    void print_tree(int cur)  {
-      for(auto elem : nods[cur].edges) {
-        auto [begin, end] = calculatePositions(nods[cur], nods[elem.first], size);
-        std::cout << nods[cur].color << ' ';
-        if(begin >= size_f) {
-          std::cout << 1 << " " << begin - size_f << " " << end - size_f - 1 << "\n";
-        }
-        else {
-          std::cout << 0 << " " << begin << " " << std::min(end - 1,  size_f) << "\n";
-        }
-        print_tree(elem.first);
-      }
-    }
+  }
 };
 
 
-
-SuffTree make_suff_tree(std::vector<int> lcp, std::vector<int> suff_arr, std::string str, int sec_str_size = 0) {
+SuffTree make_suff_tree(const std::vector<int>& lcp, const std::vector<int>& suff_arr, const std::string& str, int sec_str_size = 0) {
   SuffTree tree(str.size(), str.size() - sec_str_size);
 
-  tree.nods.push_back(Node(0));
+  tree.nodes.push_back(Node(0));
   tree.cur_path.push_back(0);
 
-  tree.nods.push_back(Node(str.size() - suff_arr[0]));
+  tree.nodes.push_back(Node(str.size() - suff_arr[0]));
   tree.cur_path.push_back(1);
 
-  tree.nods[0].edges.push_back({1, ""});
+  tree.nodes[0].edges.push_back(1);
   int cur = 1;
 
   for(int i = 0; i < lcp.size(); i++) {
@@ -190,35 +180,32 @@ SuffTree make_suff_tree(std::vector<int> lcp, std::vector<int> suff_arr, std::st
     cur = tree.addNextSuff(cur, str.size() - suff_arr[i + 1], lcp[i]);
   }
 
-
   return tree;
 }
 
 int main() {
-  std::string a, b;
+  std::string f_str, s_str;
   std::vector<int> str;
 
-  std::cin >> a >> b;
-  a += b;
+  std::cin >> f_str >> s_str;
+  f_str += s_str;
 
-  for(int i = 0; i < a.size(); i++) {
-    int symb = a[i] - 'a' + 1;
-    if(symb > 36)     str.push_back(0);
-    else if(symb < 0) str.push_back(0);
+  for(int i = 0; i < f_str.size(); i++) {
+    int symb = f_str[i] - 'a' + 1;
+    if((symb > 35) || (symb <= 0))     str.push_back(0);
     else              str.push_back(symb);
   }
 
   auto suff_arr = suffix_array(str);
-  auto lcp      = LCP(a, suff_arr);
+  auto lcp      = LCP(f_str, suff_arr);
 
-  auto suff_tree = make_suff_tree(lcp, suff_arr, a, b.size());
+  auto suff_tree = make_suff_tree(lcp, suff_arr, f_str, s_str.size());
 
   int color = 0;
 
-
   suff_tree.fill_max_depth(0, color);
 
-  std::cout << suff_tree.nods.size() << "\n";
+  std::cout << suff_tree.nodes.size() << "\n";
   suff_tree.print_tree(0);
-  
+
 }
